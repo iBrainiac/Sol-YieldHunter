@@ -1,4 +1,20 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
+
+// Add session property to Request type
+declare module 'express-session' {
+  interface SessionData {
+    sessionID: string;
+  }
+}
+
+// Extend Request type to include sessionID
+declare global {
+  namespace Express {
+    interface Request {
+      sessionID: string;
+    }
+  }
+}
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { SolanaService } from "./services/solana";
@@ -8,8 +24,10 @@ import { z } from "zod";
 import {
   insertUserPreferencesSchema,
   insertUserPortfolioSchema,
-  insertTransactionSchema
-} from "../shared/schema";
+  insertTransactionSchema,
+  insertUserSchema,
+  insertSolanaSubscriptionSchema
+} from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize services
@@ -56,6 +74,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(walletInfo);
     } catch (error: any) {
       res.status(401).json({ error: "Not connected" });
+    }
+  });
+  
+  // Subscription endpoints
+  app.get("/api/wallet/subscription", async (req, res) => {
+    try {
+      const address = req.query.address as string;
+      
+      if (!address) {
+        return res.status(400).json({ error: "Wallet address required" });
+      }
+      
+      // Find user by wallet address
+      const user = await storage.getUserByWalletAddress(address);
+      
+      if (!user) {
+        return res.json({ isSubscribed: false });
+      }
+      
+      // Check if user has an active subscription
+      const isSubscribed = await storage.checkUserIsSubscribed(user.id);
+      
+      res.json({ isSubscribed });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  app.post("/api/wallet/subscribe", async (req, res) => {
+    try {
+      const subscriptionSchema = z.object({
+        walletAddress: z.string(),
+        transactionHash: z.string(),
+        amount: z.number()
+      });
+      
+      const { walletAddress, transactionHash, amount } = subscriptionSchema.parse(req.body);
+      
+      // Find or create user
+      let user = await storage.getUserByWalletAddress(walletAddress);
+      
+      if (!user) {
+        user = await storage.createUser({
+          walletAddress,
+          username: null,
+          email: null,
+          lastLogin: new Date()
+        });
+      }
+      
+      // Create subscription record
+      const subscription = await storage.createSubscription({
+        userId: user.id,
+        transactionHash,
+        amount,
+        isActive: true
+      });
+      
+      res.json({ success: true, subscription });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
     }
   });
 

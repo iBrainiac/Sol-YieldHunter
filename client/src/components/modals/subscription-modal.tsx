@@ -62,6 +62,23 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
         ADMIN_PUBKEY
       );
 
+      // Record the subscription in our database
+      const response = await fetch('/api/wallet/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          walletAddress: publicKey.toString(),
+          transactionHash: txSignature,
+          amount: SUBSCRIPTION_FEE
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to record subscription in database');
+      }
+
       toast({
         title: "Subscription successful!",
         description: `Transaction ID: ${txSignature.slice(0, 8)}...${txSignature.slice(-8)}`,

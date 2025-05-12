@@ -107,6 +107,16 @@ export const SolanaWalletProvider = ({ children }: { children: ReactNode }) => {
   const checkUserSubscription = async () => {
     if (connection && publicKey) {
       try {
+        // First check the database for subscription
+        const response = await fetch(`/api/wallet/subscription?address=${publicKey.toString()}`);
+        const data = await response.json();
+        
+        if (data.isSubscribed) {
+          setIsSubscribed(true);
+          return;
+        }
+        
+        // If not found in database, check on-chain
         const subscribed = await checkSubscription(connection, publicKey);
         setIsSubscribed(subscribed);
       } catch (error) {

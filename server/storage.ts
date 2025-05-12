@@ -3,11 +3,25 @@ import {
   yieldOpportunities, YieldOpportunity, InsertYieldOpportunity,
   userPortfolios, UserPortfolio, InsertUserPortfolio,
   transactions, Transaction, InsertTransaction,
-  ProtocolInfo
-} from "../shared/schema";
+  ProtocolInfo,
+  users, User, InsertUser,
+  solanaSubscriptions, SolanaSubscription, InsertSolanaSubscription,
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, asc, and, or } from "drizzle-orm";
 
 // Modify the interface with any CRUD methods needed
 export interface IStorage {
+  // Users
+  getUser(id: number): Promise<User | undefined>;
+  getUserByWalletAddress(walletAddress: string): Promise<User | undefined>;
+  createUser(insertUser: InsertUser): Promise<User>;
+  
+  // Subscriptions
+  getUserSubscription(userId: number): Promise<SolanaSubscription | undefined>;
+  createSubscription(insertSubscription: InsertSolanaSubscription): Promise<SolanaSubscription>;
+  checkUserIsSubscribed(userId: number): Promise<boolean>;
+  
   // User Preferences
   getUserPreferences(userId: string): Promise<UserPreference | undefined>;
   createUserPreferences(userId: string, data: InsertUserPreference): Promise<UserPreference>;
@@ -31,37 +45,13 @@ export interface IStorage {
   createTransaction(userId: string, data: InsertTransaction): Promise<Transaction>;
 }
 
-export class MemStorage implements IStorage {
-  private userPrefsMap: Map<string, UserPreference>;
-  private yieldOppsMap: Map<number, YieldOpportunity>;
-  private userPortfoliosMap: Map<number, UserPortfolio>;
-  private transactionsMap: Map<number, Transaction>;
-  private currentIds: {
-    userPrefs: number;
-    yieldOpps: number;
-    userPortfolios: number;
-    transactions: number;
-  };
+// Database Storage Implementation
+export class DatabaseStorage implements IStorage {
   private protocolsInfo: Map<string, ProtocolInfo>;
 
   constructor() {
-    this.userPrefsMap = new Map();
-    this.yieldOppsMap = new Map();
-    this.userPortfoliosMap = new Map();
-    this.transactionsMap = new Map();
-    this.currentIds = {
-      userPrefs: 1,
-      yieldOpps: 1,
-      userPortfolios: 1,
-      transactions: 1
-    };
     this.protocolsInfo = new Map();
-    this.initializeData();
-  }
-
-  // Initialize with sample data for development
-  private initializeData() {
-    // Protocol information
+    // Initialize the protocol information
     const protocols: ProtocolInfo[] = [
       { name: "Raydium", logo: "gradient-to-r from-pink-500 to-purple-500", url: "https://raydium.io" },
       { name: "Marinade", logo: "orange-500", url: "https://marinade.finance" },
@@ -73,159 +63,147 @@ export class MemStorage implements IStorage {
     protocols.forEach(protocol => {
       this.protocolsInfo.set(protocol.name, protocol);
     });
+  }
 
-    // Yield opportunities
-    const yields: Partial<YieldOpportunity>[] = [
-      {
-        name: "SOL-USDC LP",
-        protocol: "Raydium",
-        apy: 14.2,
-        baseApy: 10.6,
-        rewardApy: 3.6,
-        riskLevel: "Medium",
-        tvl: 24500000,
-        assetType: "Liquidity Provider",
-        tokenPair: ["SOL", "USDC"],
-        depositFee: 0.25,
-        withdrawalFee: 0.25,
-        lastUpdated: new Date(),
-        link: "https://raydium.io/pools"
-      },
-      {
-        name: "Staked SOL (mSOL)",
-        protocol: "Marinade",
-        apy: 6.8,
-        baseApy: 6.1,
-        rewardApy: 0.7,
-        riskLevel: "Low",
-        tvl: 154200000,
-        assetType: "Liquid Staking",
-        tokenPair: ["SOL"],
-        depositFee: 0,
-        withdrawalFee: 0,
-        lastUpdated: new Date(),
-        link: "https://marinade.finance"
-      },
-      {
-        name: "USDT-USDC LP",
-        protocol: "Orca",
-        apy: 4.3,
-        baseApy: 1.2,
-        rewardApy: 3.1,
-        riskLevel: "Low",
-        tvl: 89700000,
-        assetType: "Stable Pair",
-        tokenPair: ["USDT", "USDC"],
-        depositFee: 0.3,
-        withdrawalFee: 0.3,
-        lastUpdated: new Date(),
-        link: "https://www.orca.so"
-      },
-      {
-        name: "BTC-SOL LP",
-        protocol: "Raydium",
-        apy: 9.7,
-        baseApy: 7.2,
-        rewardApy: 2.5,
-        riskLevel: "Medium-High",
-        tvl: 12300000,
-        assetType: "Concentrated Liquidity",
-        tokenPair: ["BTC", "SOL"],
-        depositFee: 0.25,
-        withdrawalFee: 0.25,
-        lastUpdated: new Date(),
-        link: "https://raydium.io/pools"
-      },
-      {
-        name: "USDC Lending",
-        protocol: "Solend",
-        apy: 3.4,
-        baseApy: 2.1,
-        rewardApy: 1.3,
-        riskLevel: "Low",
-        tvl: 201100000,
-        assetType: "Money Market",
-        tokenPair: ["USDC"],
-        depositFee: 0,
-        withdrawalFee: 0,
-        lastUpdated: new Date(),
-        link: "https://solend.fi"
-      }
-    ];
+  // Users
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
 
-    yields.forEach(yield_ => {
-      const id = this.currentIds.yieldOpps++;
-      const yieldOpp: YieldOpportunity = {
-        id,
-        name: yield_.name!,
-        protocol: yield_.protocol!,
-        apy: yield_.apy!,
-        baseApy: yield_.baseApy!,
-        rewardApy: yield_.rewardApy!,
-        riskLevel: yield_.riskLevel!,
-        tvl: yield_.tvl!,
-        assetType: yield_.assetType!,
-        tokenPair: yield_.tokenPair!,
-        depositFee: yield_.depositFee!,
-        withdrawalFee: yield_.withdrawalFee!,
-        lastUpdated: yield_.lastUpdated!,
-        link: yield_.link!
-      };
-      this.yieldOppsMap.set(id, yieldOpp);
-    });
+  async getUserByWalletAddress(walletAddress: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.walletAddress, walletAddress));
+    return user || undefined;
+  }
 
-    // Add some initial user preferences for testing
-    const defaultPrefs: UserPreference = {
-      id: this.currentIds.userPrefs++,
-      userId: 'default-session',
-      telegramChatId: null,
-      telegramUsername: null,
-      riskTolerance: 'moderate',
-      preferredChains: ['solana'],
-      preferredTokens: ['SOL', 'USDC'],
-      notificationsEnabled: true
-    };
-    this.userPrefsMap.set(defaultPrefs.userId, defaultPrefs);
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  // Subscriptions
+  async getUserSubscription(userId: number): Promise<SolanaSubscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(solanaSubscriptions)
+      .where(eq(solanaSubscriptions.userId, userId));
+    return subscription || undefined;
+  }
+
+  async createSubscription(insertSubscription: InsertSolanaSubscription): Promise<SolanaSubscription> {
+    const [subscription] = await db
+      .insert(solanaSubscriptions)
+      .values(insertSubscription)
+      .returning();
+    return subscription;
+  }
+
+  async checkUserIsSubscribed(userId: number): Promise<boolean> {
+    const [subscription] = await db
+      .select()
+      .from(solanaSubscriptions)
+      .where(and(
+        eq(solanaSubscriptions.userId, userId),
+        eq(solanaSubscriptions.isActive, true)
+      ));
+    return !!subscription;
   }
 
   // User Preferences
   async getUserPreferences(userId: string): Promise<UserPreference | undefined> {
-    return this.userPrefsMap.get(userId);
+    // First, try to find the user by wallet address
+    const user = await this.getUserByWalletAddress(userId);
+    
+    if (!user) {
+      return undefined;
+    }
+    
+    const [preferences] = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, user.id));
+      
+    return preferences || undefined;
   }
 
   async createUserPreferences(userId: string, data: InsertUserPreference): Promise<UserPreference> {
-    const id = this.currentIds.userPrefs++;
-    const newPrefs: UserPreference = { id, userId, ...data };
-    this.userPrefsMap.set(userId, newPrefs);
-    return newPrefs;
+    // Get the user ID first
+    let user = await this.getUserByWalletAddress(userId);
+    
+    if (!user) {
+      // Create a new user if they don't exist
+      user = await this.createUser({
+        walletAddress: userId,
+        username: null,
+        email: null,
+        lastLogin: new Date()
+      });
+    }
+    
+    // Now create the preferences
+    const [preferences] = await db
+      .insert(userPreferences)
+      .values({
+        ...data,
+        userId: user.id
+      })
+      .returning();
+      
+    return preferences;
   }
 
   async updateUserPreferences(userId: string, data: Partial<InsertUserPreference>): Promise<UserPreference> {
-    let prefs = this.userPrefsMap.get(userId);
+    let user = await this.getUserByWalletAddress(userId);
     
-    if (!prefs) {
-      const id = this.currentIds.userPrefs++;
-      prefs = { 
-        id, 
-        userId, 
-        telegramChatId: null,
-        telegramUsername: null,
-        riskTolerance: 'moderate',
-        preferredChains: ['solana'],
-        preferredTokens: [],
-        notificationsEnabled: true,
-        ...data 
-      };
-    } else {
-      prefs = { ...prefs, ...data };
+    if (!user) {
+      // Create a new user if they don't exist
+      user = await this.createUser({
+        walletAddress: userId,
+        username: null,
+        email: null,
+        lastLogin: new Date()
+      });
     }
     
-    this.userPrefsMap.set(userId, prefs);
-    return prefs;
+    // Check if preferences already exist
+    let [preferences] = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, user.id));
+      
+    if (preferences) {
+      // Update existing preferences
+      [preferences] = await db
+        .update(userPreferences)
+        .set(data)
+        .where(eq(userPreferences.id, preferences.id))
+        .returning();
+    } else {
+      // Create new preferences
+      [preferences] = await db
+        .insert(userPreferences)
+        .values({
+          userId: user.id,
+          telegramChatId: null,
+          telegramUsername: null,
+          riskTolerance: 'moderate',
+          preferredChains: ['solana'],
+          preferredTokens: [],
+          notificationsEnabled: true,
+          ...data
+        })
+        .returning();
+    }
+    
+    return preferences;
   }
 
   async getUserRiskProfile(userId: string): Promise<{ level: string; percentage: number }> {
-    const prefs = this.userPrefsMap.get(userId);
+    const prefs = await this.getUserPreferences(userId);
+    
     if (!prefs) {
       return { level: 'moderate-conservative', percentage: 35 };
     }
@@ -246,49 +224,48 @@ export class MemStorage implements IStorage {
 
   // Yield Opportunities
   async getYieldOpportunities(protocol?: string, sortBy: string = 'apy'): Promise<YieldOpportunity[]> {
-    let opportunities = Array.from(this.yieldOppsMap.values());
-
+    let query = db.select().from(yieldOpportunities);
+    
     // Filter by protocol if provided
     if (protocol && protocol !== 'all') {
-      opportunities = opportunities.filter(op => 
-        op.protocol.toLowerCase() === protocol.toLowerCase()
-      );
+      query = query.where(eq(yieldOpportunities.protocol, protocol));
     }
-
-    // Sort based on the sortBy parameter
+    
+    // Sort based on sortBy parameter
     switch (sortBy.toLowerCase()) {
       case 'apy':
-        opportunities.sort((a, b) => Number(b.apy) - Number(a.apy));
-        break;
-      case 'risk':
-        const riskOrder: Record<string, number> = {
-          'low': 1,
-          'medium': 2,
-          'medium-high': 3,
-          'high': 4
-        };
-        opportunities.sort((a, b) => 
-          riskOrder[a.riskLevel.toLowerCase()] - riskOrder[b.riskLevel.toLowerCase()]
-        );
+        query = query.orderBy(desc(yieldOpportunities.apy));
         break;
       case 'tvl':
-        opportunities.sort((a, b) => Number(b.tvl) - Number(a.tvl));
+        query = query.orderBy(desc(yieldOpportunities.tvl));
+        break;
+      case 'risk':
+        // This is more complex as risk level is a string
+        // Will need to add a custom sort or consider adding a numeric risk level field
+        // For now, just return without explicit ordering
         break;
     }
-
-    return opportunities;
+    
+    return await query;
   }
 
   async getYieldOpportunity(id: number): Promise<YieldOpportunity | undefined> {
-    return this.yieldOppsMap.get(id);
+    const [opportunity] = await db
+      .select()
+      .from(yieldOpportunities)
+      .where(eq(yieldOpportunities.id, id));
+      
+    return opportunity || undefined;
   }
 
   async getBestYieldOpportunity(): Promise<YieldOpportunity | undefined> {
-    const opportunities = Array.from(this.yieldOppsMap.values());
-    if (opportunities.length === 0) return undefined;
-    
-    // Sort by APY (highest first)
-    return opportunities.sort((a, b) => Number(b.apy) - Number(a.apy))[0];
+    const [opportunity] = await db
+      .select()
+      .from(yieldOpportunities)
+      .orderBy(desc(yieldOpportunities.apy))
+      .limit(1);
+      
+    return opportunity || undefined;
   }
 
   async getProtocolInfo(name: string): Promise<ProtocolInfo | undefined> {
@@ -296,7 +273,7 @@ export class MemStorage implements IStorage {
   }
 
   async getYieldStats(): Promise<{ avgApy: number; protocolCount: number; opportunityCount: number }> {
-    const opportunities = Array.from(this.yieldOppsMap.values());
+    const opportunities = await db.select().from(yieldOpportunities);
     const protocols = new Set(opportunities.map(o => o.protocol));
     
     const totalApy = opportunities.reduce((sum, op) => sum + Number(op.apy), 0);
@@ -311,9 +288,26 @@ export class MemStorage implements IStorage {
 
   // User Portfolios
   async getUserPortfolio(userId: string, timeRange: string = '1M'): Promise<any> {
+    // Get the user ID first
+    const user = await this.getUserByWalletAddress(userId);
+    
+    if (!user) {
+      return {
+        totalValue: 0,
+        changePercentage: 0,
+        chartData: [30, 40, 35, 60, 50, 70, 65, 90, 80, 100, 90, 95],
+        positions: []
+      };
+    }
+    
     // Get user positions
-    const userPositions = Array.from(this.userPortfoliosMap.values())
-      .filter(portfolio => portfolio.userId === userId && portfolio.active);
+    const userPositions = await db
+      .select()
+      .from(userPortfolios)
+      .where(and(
+        eq(userPortfolios.userId, user.id),
+        eq(userPortfolios.active, true)
+      ));
 
     if (userPositions.length === 0) {
       return {
@@ -324,7 +318,7 @@ export class MemStorage implements IStorage {
       };
     }
 
-    // Calculate total value and get position details
+    // Calculate total value
     const totalValue = userPositions.reduce((sum, pos) => sum + Number(pos.amount), 0);
     
     // Map to position details with protocol
@@ -338,11 +332,8 @@ export class MemStorage implements IStorage {
       };
     }));
 
-    // Generate chart data based on time range
-    // This would normally come from historical data
+    // Generate chart data and change percentage
     const chartData = this.generateChartData(timeRange);
-    
-    // Calculate change percentage based on time range
     const changePercentage = this.calculateChangePercentage(timeRange);
 
     return {
@@ -354,8 +345,25 @@ export class MemStorage implements IStorage {
   }
 
   async getPortfolioSummary(userId: string): Promise<any> {
-    const userPositions = Array.from(this.userPortfoliosMap.values())
-      .filter(portfolio => portfolio.userId === userId && portfolio.active);
+    // Get the user ID first
+    const user = await this.getUserByWalletAddress(userId);
+    
+    if (!user) {
+      return {
+        activePositions: 0,
+        protocolCount: 0,
+        protocols: []
+      };
+    }
+    
+    // Get user positions
+    const userPositions = await db
+      .select()
+      .from(userPortfolios)
+      .where(and(
+        eq(userPortfolios.userId, user.id),
+        eq(userPortfolios.active, true)
+      ));
 
     if (userPositions.length === 0) {
       return {
@@ -384,23 +392,35 @@ export class MemStorage implements IStorage {
   }
 
   async createInvestment(userId: string, data: InsertUserPortfolio): Promise<UserPortfolio> {
-    // Create the portfolio entry
-    const id = this.currentIds.userPortfolios++;
-    const portfolioEntry: UserPortfolio = {
-      id,
-      userId,
-      ...data,
-      depositDate: new Date(),
-      active: true
-    };
+    // Get the user ID first
+    let user = await this.getUserByWalletAddress(userId);
     
-    this.userPortfoliosMap.set(id, portfolioEntry);
-
+    if (!user) {
+      // Create a new user if they don't exist
+      user = await this.createUser({
+        walletAddress: userId,
+        username: null,
+        email: null,
+        lastLogin: new Date()
+      });
+    }
+    
+    // Create the portfolio entry
+    const [portfolioEntry] = await db
+      .insert(userPortfolios)
+      .values({
+        ...data,
+        userId: user.id,
+        depositDate: new Date(),
+        active: true
+      })
+      .returning();
+    
     // Also create a transaction record for this investment
     const opportunity = await this.getYieldOpportunity(data.opportunityId);
     
     await this.createTransaction(userId, {
-      userId,
+      userId: String(user.id), // This interface expects a string
       opportunityId: data.opportunityId,
       transactionType: 'invest',
       amount: data.amount,
@@ -419,20 +439,29 @@ export class MemStorage implements IStorage {
 
   // Transactions
   async getUserTransactions(userId: string, filter: string = 'all'): Promise<Transaction[]> {
-    let transactions = Array.from(this.transactionsMap.values())
-      .filter(tx => tx.userId === userId);
-
+    // Get the user ID first
+    const user = await this.getUserByWalletAddress(userId);
+    
+    if (!user) {
+      return [];
+    }
+    
+    // Build query
+    let query = db.select().from(transactions).where(eq(transactions.userId, user.id));
+    
     // Apply filters
     if (filter !== 'all') {
       if (filter === 'invest' || filter === 'withdraw') {
-        transactions = transactions.filter(tx => tx.transactionType === filter);
+        query = query.where(eq(transactions.transactionType, filter));
       } else if (filter === 'completed' || filter === 'pending' || filter === 'failed') {
-        transactions = transactions.filter(tx => tx.status === filter);
+        query = query.where(eq(transactions.status, filter));
       }
     }
-
+    
+    const userTransactions = await query;
+    
     // Add protocol information
-    return Promise.all(transactions.map(async tx => {
+    return Promise.all(userTransactions.map(async tx => {
       const opportunity = await this.getYieldOpportunity(tx.opportunityId);
       return {
         ...tx,
@@ -442,17 +471,32 @@ export class MemStorage implements IStorage {
   }
 
   async createTransaction(userId: string, data: InsertTransaction): Promise<Transaction> {
-    const id = this.currentIds.transactions++;
-    const transaction: Transaction = {
-      id,
-      ...data
-    };
+    // Get the user ID first
+    let user = await this.getUserByWalletAddress(userId);
     
-    this.transactionsMap.set(id, transaction);
+    if (!user) {
+      // Create a new user if they don't exist
+      user = await this.createUser({
+        walletAddress: userId,
+        username: null,
+        email: null,
+        lastLogin: new Date()
+      });
+    }
+    
+    // Create the transaction
+    const [transaction] = await db
+      .insert(transactions)
+      .values({
+        ...data,
+        userId: user.id // Convert string to number
+      })
+      .returning();
+      
     return transaction;
   }
 
-  // Helper functions
+  // Helper methods
   private generateChartData(timeRange: string): number[] {
     // Generate random chart data based on time range
     const pointCount = timeRange === '1D' ? 24 : 
@@ -479,7 +523,7 @@ export class MemStorage implements IStorage {
     
     // Make sure the last value is higher than the first for a positive trend
     if (data[data.length - 1] < data[0]) {
-      data[data.length - 1] = data[0] * 1.1;
+      data[data.length - 1] = Math.round(data[0] * 1.1);
     }
     
     return data;
@@ -496,20 +540,18 @@ export class MemStorage implements IStorage {
       case '1M':
         return parseFloat((Math.random() * 8 + 3).toFixed(1));
       case '1Y':
-        return parseFloat((Math.random() * 30 + 10).toFixed(1));
-      default:
         return parseFloat((Math.random() * 12 + 5).toFixed(1));
+      default:
+        return parseFloat((Math.random() * 5 + 2).toFixed(1));
     }
   }
 
   private generateFakeTransactionHash(): string {
-    const chars = '0123456789abcdef';
-    let hash = '';
-    for (let i = 0; i < 64; i++) {
-      hash += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return hash;
+    return Array.from({ length: 64 }, () => 
+      '0123456789abcdef'[Math.floor(Math.random() * 16)]
+    ).join('');
   }
 }
 
-export const storage = new MemStorage();
+// Export an instance of the storage class
+export const storage = new DatabaseStorage();
