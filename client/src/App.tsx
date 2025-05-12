@@ -7,6 +7,7 @@ import Transactions from "@/pages/transactions";
 import FAQ from "@/pages/faq";
 import Settings from "@/pages/settings";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SolanaWalletProvider } from "@/contexts/SolanaWalletContext";
 
 function Router() {
   return (
@@ -23,14 +24,16 @@ function Router() {
 
 function App() {
   return (
-    <TooltipProvider>
-      <div className="min-h-screen flex flex-col md:flex-row">
-        <Sidebar />
-        <main className="flex-1 md:ml-64 bg-background min-h-screen">
-          <Router />
-        </main>
-      </div>
-    </TooltipProvider>
+    <SolanaWalletProvider>
+      <TooltipProvider>
+        <div className="min-h-screen flex flex-col md:flex-row">
+          <Sidebar />
+          <main className="flex-1 md:ml-64 bg-background min-h-screen">
+            <Router />
+          </main>
+        </div>
+      </TooltipProvider>
+    </SolanaWalletProvider>
   );
 }
 
