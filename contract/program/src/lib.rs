@@ -1,190 +1,237 @@
-use borsh::{BorshDeserialize, BorshSerialize};
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
     entrypoint,
     entrypoint::ProgramResult,
-    msg,
-    program_error::ProgramError,
     pubkey::Pubkey,
-    rent::Rent,
-    system_instruction,
+    program_error::ProgramError,
     program::{invoke, invoke_signed},
-    sysvar::Sysvar,
+    system_instruction,
+    msg,
+    sysvar::{rent::Rent, Sysvar},
+    borsh::try_from_slice_unchecked,
 };
+use borsh::{BorshDeserialize, BorshSerialize};
 
-// Define the entrypoint that all Solana programs must have
-entrypoint!(process_instruction);
-
-// Program ID: this will be determined when you deploy the program
-// solana_program::declare_id!("your_program_id_here");
-
-// Subscription fee in lamports (10 SOL = 10 * 10^9 lamports)
-const SUBSCRIPTION_FEE: u64 = 10_000_000_000;
-
-// Instruction enum for our program
-#[derive(BorshSerialize, BorshDeserialize, Debug)]
-pub enum SubscriptionInstruction {
-    // Pay the subscription fee
-    PaySubscription,
-    // Admin can withdraw collected fees
-    WithdrawFees { amount: u64 },
-    // Check if wallet has an active subscription
-    CheckSubscription,
-}
-
-// Subscription state stored in an account
+/// Define the subscription account data structure
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub struct SubscriptionAccount {
     pub is_subscribed: bool,
-    pub subscription_date: i64,
+    pub subscription_date: u64,
     pub admin: Pubkey,
 }
 
-// Main instruction processor function
+/// Instruction enum for the subscription program
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub enum SubscriptionInstruction {
+    /// Pay the subscription fee (10 SOL)
+    /// 0. `[signer]` The user paying for the subscription
+    /// 1. `[writable]` The subscription PDA account owned by this program
+    /// 2. `[writable]` The admin account that receives the fees
+    /// 3. `[]` System program
+    PaySubscription,
+    
+    /// Withdraw fees (admin only)
+    /// 0. `[signer]` The admin withdrawing the fees
+    /// 1. `[writable]` The subscription PDA account owned by this program
+    /// 2. `[]` System program
+    WithdrawFees {
+        amount: u64,
+    },
+    
+    /// Check if a user is subscribed
+    /// 0. `[]` The user's public key
+    /// 1. `[]` The subscription PDA account owned by this program
+    CheckSubscription,
+}
+
+// Program entrypoint
+entrypoint!(process_instruction);
+
+// Process program instructions
 pub fn process_instruction(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    // Deserialize the instruction data
-    let instruction = SubscriptionInstruction::try_from_slice(instruction_data)
-        .map_err(|_| ProgramError::InvalidInstructionData)?;
-
+    let instruction = SubscriptionInstruction::try_from_slice(instruction_data)?;
+    
     match instruction {
         SubscriptionInstruction::PaySubscription => {
-            pay_subscription(program_id, accounts)
-        }
+            process_pay_subscription(program_id, accounts)
+        },
         SubscriptionInstruction::WithdrawFees { amount } => {
-            withdraw_fees(program_id, accounts, amount)
-        }
+            process_withdraw_fees(program_id, accounts, amount)
+        },
         SubscriptionInstruction::CheckSubscription => {
-            check_subscription(program_id, accounts)
-        }
+            process_check_subscription(program_id, accounts)
+        },
     }
 }
 
-// Process the PaySubscription instruction
-fn pay_subscription(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
-    let accounts_iter = &mut accounts.iter();
+// Process subscription payment
+pub fn process_pay_subscription(
+    program_id: &Pubkey, 
+    accounts: &[AccountInfo]
+) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
     
-    // Get accounts from the transaction
-    let user = next_account_info(accounts_iter)?;
-    let subscription_account = next_account_info(accounts_iter)?;
-    let admin_account = next_account_info(accounts_iter)?;
-    let system_program = next_account_info(accounts_iter)?;
+    // Get accounts
+    let user_account = next_account_info(account_info_iter)?;
+    let subscription_account = next_account_info(account_info_iter)?;
+    let admin_account = next_account_info(account_info_iter)?;
+    let system_program = next_account_info(account_info_iter)?;
     
-    // Ensure the user signed the transaction
-    if !user.is_signer {
+    // Verify user signed the transaction
+    if !user_account.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
     
-    // Check if the subscription account belongs to our program
+    // Verify the subscription account is owned by the program
     if subscription_account.owner != program_id {
-        // If it doesn't, we need to create the account
-        let rent = Rent::get()?;
+        // If account doesn't exist, create it
+        let (pda, bump_seed) = Pubkey::find_program_address(
+            &[b"subscription", user_account.key.as_ref()],
+            program_id
+        );
+        
+        if pda != *subscription_account.key {
+            return Err(ProgramError::InvalidAccountData);
+        }
+        
+        // Calculate the space needed for the subscription account
         let space = std::mem::size_of::<SubscriptionAccount>();
-        let rent_lamports = rent.minimum_balance(space);
+        let rent = Rent::get()?;
+        let lamports = rent.minimum_balance(space);
         
         // Create the subscription account
-        invoke(
+        invoke_signed(
             &system_instruction::create_account(
-                user.key,
+                user_account.key,
                 subscription_account.key,
-                rent_lamports,
+                lamports,
                 space as u64,
-                program_id,
+                program_id
             ),
-            &[user.clone(), subscription_account.clone(), system_program.clone()],
+            &[
+                user_account.clone(),
+                subscription_account.clone(),
+                system_program.clone(),
+            ],
+            &[&[b"subscription", user_account.key.as_ref(), &[bump_seed]]],
         )?;
-        
-        // Initialize the subscription account data
-        let subscription_data = SubscriptionAccount {
-            is_subscribed: false,
-            subscription_date: 0,
-            admin: *admin_account.key,
-        };
-        
-        subscription_data.serialize(&mut &mut subscription_account.data.borrow_mut()[..])?;
     }
     
-    // Transfer the subscription fee to the admin
+    // Subscription fee in SOL
+    let subscription_fee: u64 = 10_000_000_000; // 10 SOL
+    
+    // Transfer the subscription fee from user to admin
     invoke(
         &system_instruction::transfer(
-            user.key,
+            user_account.key,
             admin_account.key,
-            SUBSCRIPTION_FEE,
+            subscription_fee
         ),
-        &[user.clone(), admin_account.clone(), system_program.clone()],
+        &[
+            user_account.clone(),
+            admin_account.clone(),
+            system_program.clone(),
+        ],
     )?;
     
-    // Update the subscription account to show the user has paid
-    let mut subscription_data = SubscriptionAccount::try_from_slice(&subscription_account.data.borrow())?;
-    subscription_data.is_subscribed = true;
-    subscription_data.subscription_date = solana_program::clock::Clock::get()?.unix_timestamp;
+    // Update subscription account data
+    let subscription_data = SubscriptionAccount {
+        is_subscribed: true,
+        subscription_date: solana_program::clock::Clock::get()?.unix_timestamp as u64,
+        admin: *admin_account.key,
+    };
+    
     subscription_data.serialize(&mut &mut subscription_account.data.borrow_mut()[..])?;
     
-    msg!("Subscription payment successful!");
+    msg!("Subscription payment successful. User is now subscribed!");
     Ok(())
 }
 
-// Process the WithdrawFees instruction
-fn withdraw_fees(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -> ProgramResult {
-    let accounts_iter = &mut accounts.iter();
+// Process fee withdrawal
+pub fn process_withdraw_fees(
+    program_id: &Pubkey, 
+    accounts: &[AccountInfo],
+    amount: u64
+) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
     
-    // Get accounts from the transaction
-    let admin = next_account_info(accounts_iter)?;
-    let subscription_account = next_account_info(accounts_iter)?;
-    let system_program = next_account_info(accounts_iter)?;
+    // Get accounts
+    let admin_account = next_account_info(account_info_iter)?;
+    let subscription_account = next_account_info(account_info_iter)?;
+    let system_program = next_account_info(account_info_iter)?;
     
-    // Ensure the admin signed the transaction
-    if !admin.is_signer {
+    // Verify admin signed the transaction
+    if !admin_account.is_signer {
         return Err(ProgramError::MissingRequiredSignature);
     }
     
-    // Verify the admin is authorized by checking the stored admin key
-    let subscription_data = SubscriptionAccount::try_from_slice(&subscription_account.data.borrow())?;
-    if subscription_data.admin != *admin.key {
+    // Verify the subscription account is owned by the program
+    if subscription_account.owner != program_id {
         return Err(ProgramError::InvalidAccountData);
     }
     
-    // Calculate available balance
-    let balance = **subscription_account.lamports.borrow();
-    let rent = Rent::get()?;
-    let minimum_balance = rent.minimum_balance(subscription_account.data_len());
+    // Deserialize the subscription account data
+    let subscription_data = try_from_slice_unchecked::<SubscriptionAccount>(&subscription_account.data.borrow())?;
     
-    // Ensure we keep enough for rent exemption
-    if balance - amount < minimum_balance {
-        return Err(ProgramError::InsufficientFunds);
+    // Verify the admin is the owner
+    if subscription_data.admin != *admin_account.key {
+        return Err(ProgramError::InvalidAccountData);
     }
     
-    // Transfer the specified amount to the admin
-    **subscription_account.lamports.borrow_mut() -= amount;
-    **admin.lamports.borrow_mut() += amount;
+    // Calculate the PDA and bump seed
+    let (pda, bump_seed) = Pubkey::find_program_address(
+        &[b"subscription"],
+        program_id
+    );
     
-    msg!("Fees withdrawn successfully!");
+    // Transfer the specified amount from the PDA to the admin
+    invoke_signed(
+        &system_instruction::transfer(
+            subscription_account.key,
+            admin_account.key,
+            amount
+        ),
+        &[
+            subscription_account.clone(),
+            admin_account.clone(),
+            system_program.clone(),
+        ],
+        &[&[b"subscription", &[bump_seed]]],
+    )?;
+    
+    msg!("Withdrew {} lamports to admin account", amount);
     Ok(())
 }
 
-// Process the CheckSubscription instruction
-fn check_subscription(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
-    let accounts_iter = &mut accounts.iter();
+// Process check subscription status
+pub fn process_check_subscription(
+    program_id: &Pubkey, 
+    accounts: &[AccountInfo]
+) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
     
-    // Get accounts from the transaction
-    let user = next_account_info(accounts_iter)?;
-    let subscription_account = next_account_info(accounts_iter)?;
+    // Get accounts
+    let user_account = next_account_info(account_info_iter)?;
+    let subscription_account = next_account_info(account_info_iter)?;
     
-    // Check if subscription account exists and belongs to our program
+    // Verify the subscription account is owned by the program
     if subscription_account.owner != program_id {
-        msg!("Not subscribed: Subscription account not found");
+        msg!("User is not subscribed: account not owned by program");
         return Ok(());
     }
     
-    // Check if user is subscribed
-    let subscription_data = SubscriptionAccount::try_from_slice(&subscription_account.data.borrow())?;
+    // Deserialize the subscription account data
+    let subscription_data = try_from_slice_unchecked::<SubscriptionAccount>(&subscription_account.data.borrow())?;
+    
+    // Check if the user is subscribed
     if subscription_data.is_subscribed {
-        msg!("Subscription active. Subscription date: {}", subscription_data.subscription_date);
+        msg!("User is subscribed since {}", subscription_data.subscription_date);
     } else {
-        msg!("Not subscribed: Subscription not active");
+        msg!("User is not subscribed");
     }
     
     Ok(())

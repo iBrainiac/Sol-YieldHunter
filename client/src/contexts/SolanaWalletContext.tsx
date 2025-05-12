@@ -4,7 +4,7 @@ import { checkSubscription } from '@/lib/subscription';
 import { useToast } from '@/hooks/use-toast';
 
 // Default admin public key (replace with your admin wallet when deploying)
-export const ADMIN_PUBKEY = new PublicKey('YOUR_ADMIN_WALLET_ADDRESS');
+export const ADMIN_PUBKEY = new PublicKey('11111111111111111111111111111111');
 
 // Define the wallet context type
 interface SolanaWalletContextType {
@@ -51,7 +51,7 @@ export const SolanaWalletProvider = ({ children }: { children: ReactNode }) => {
   // Initialize the connection
   useEffect(() => {
     const conn = new Connection(
-      process.env.VITE_SOLANA_RPC_URL || clusterApiUrl('devnet'),
+      import.meta.env.VITE_SOLANA_RPC_URL || clusterApiUrl('devnet'),
       'confirmed'
     );
     setConnection(conn);

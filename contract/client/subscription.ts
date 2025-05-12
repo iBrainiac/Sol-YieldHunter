@@ -1,29 +1,29 @@
 import {
   Connection,
   PublicKey,
-  SystemProgram,
   Transaction,
   TransactionInstruction,
-  sendAndConfirmTransaction,
+  SystemProgram,
   Keypair,
+  LAMPORTS_PER_SOL,
+  sendAndConfirmTransaction
 } from '@solana/web3.js';
-import { serialize, deserialize } from 'borsh';
+import * as borsh from 'borsh';
 
-// Define the program ID (this will be determined when you deploy the program)
-const PROGRAM_ID = 'PLACEHOLDER_PROGRAM_ID'; // Replace with your actual program ID after deployment
+// Define the program ID (this will be determined when the program is deployed)
+const PROGRAM_ID = 'Place_Holder_Program_ID'; // Replace with actual program ID when deployed
 
 // Subscription fee in SOL
-const SUBSCRIPTION_FEE = 10;
-const LAMPORTS_PER_SOL = 1_000_000_000;
+const SUBSCRIPTION_FEE = 10 * LAMPORTS_PER_SOL;
 
-// Instruction enum for the subscription program
+// Instruction types for the subscription program
 enum SubscriptionInstruction {
   PaySubscription = 0,
   WithdrawFees = 1,
   CheckSubscription = 2,
 }
 
-// Class representing the subscription account data
+// SubscriptionAccount class for borsh serialization/deserialization
 class SubscriptionAccount {
   is_subscribed: boolean;
   subscription_date: number;
@@ -42,7 +42,7 @@ class SubscriptionAccount {
         kind: 'struct',
         fields: [
           ['is_subscribed', 'boolean'],
-          ['subscription_date', 'i64'],
+          ['subscription_date', 'u64'],
           ['admin', [32]],
         ],
       },
@@ -50,7 +50,7 @@ class SubscriptionAccount {
   ]);
 }
 
-// Instruction data for WithdrawFees
+// WithdrawFeesData class for borsh serialization
 class WithdrawFeesData {
   instruction: number;
   amount: number;
@@ -89,45 +89,75 @@ async function findSubscriptionAccount(userPubkey: PublicKey): Promise<[PublicKe
  */
 export async function paySubscription(
   connection: Connection,
-  userWallet: any, // Wallet interface
+  wallet: any, // Wallet interface with signTransaction method
   adminPubkey: PublicKey
 ): Promise<string> {
-  try {
-    const userPubkey = userWallet.publicKey;
-    
-    // Find the user's subscription account PDA
-    const [subscriptionAccount, _] = await findSubscriptionAccount(userPubkey);
-    
-    // Create the instruction
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: userPubkey, isSigner: true, isWritable: true },
-        { pubkey: subscriptionAccount, isSigner: false, isWritable: true },
-        { pubkey: adminPubkey, isSigner: false, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      programId: new PublicKey(PROGRAM_ID),
-      data: Buffer.from([SubscriptionInstruction.PaySubscription]),
-    });
-    
-    // Create and sign the transaction
-    const transaction = new Transaction().add(instruction);
-    const { blockhash } = await connection.getLatestBlockhash();
-    transaction.recentBlockhash = blockhash;
-    transaction.feePayer = userPubkey;
-    
-    // Sign and send the transaction
-    const signedTx = await userWallet.signTransaction(transaction);
-    const txId = await connection.sendRawTransaction(signedTx.serialize());
-    
-    // Wait for confirmation
-    await connection.confirmTransaction(txId);
-    
-    return txId;
-  } catch (error) {
-    console.error('Error paying subscription:', error);
-    throw error;
+  if (!wallet.publicKey) {
+    throw new Error('Wallet not connected');
   }
+
+  // During development, before the program is deployed, we'll just do a direct transfer
+  const userPubkey = wallet.publicKey;
+  
+  // Create a simple transfer transaction
+  const transaction = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: userPubkey,
+      toPubkey: adminPubkey,
+      lamports: SUBSCRIPTION_FEE
+    })
+  );
+  
+  // Get recent blockhash
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = userPubkey;
+  
+  // Sign and send the transaction
+  const signedTx = await wallet.signTransaction(transaction);
+  const txId = await connection.sendRawTransaction(signedTx.serialize());
+  
+  // Wait for confirmation
+  await connection.confirmTransaction(txId);
+  
+  return txId;
+  
+  // When the program is deployed, use this code instead:
+  /*
+  // Find the subscription account PDA
+  const [subscriptionAccount, _] = await findSubscriptionAccount(userPubkey);
+  
+  // Serialize the instruction
+  const buffer = Buffer.alloc(1);
+  buffer.writeUInt8(SubscriptionInstruction.PaySubscription, 0);
+  
+  // Create the transaction instruction
+  const instruction = new TransactionInstruction({
+    keys: [
+      { pubkey: userPubkey, isSigner: true, isWritable: true },
+      { pubkey: subscriptionAccount, isSigner: false, isWritable: true },
+      { pubkey: adminPubkey, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    programId: new PublicKey(PROGRAM_ID),
+    data: buffer,
+  });
+  
+  // Create and send the transaction
+  const transaction = new Transaction().add(instruction);
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = userPubkey;
+  
+  // Sign and send the transaction
+  const signedTx = await wallet.signTransaction(transaction);
+  const txId = await connection.sendRawTransaction(signedTx.serialize());
+  
+  // Wait for confirmation
+  await connection.confirmTransaction(txId);
+  
+  return txId;
+  */
 }
 
 /**
@@ -137,35 +167,48 @@ export async function checkSubscription(
   connection: Connection,
   userPubkey: PublicKey
 ): Promise<boolean> {
+  // For development purposes, we'll check if the user has enough balance to pay for a subscription
   try {
-    // Find the user's subscription account PDA
-    const [subscriptionAccount, _] = await findSubscriptionAccount(userPubkey);
-    
-    // Get the subscription account data
-    try {
-      const accountInfo = await connection.getAccountInfo(subscriptionAccount);
-      
-      // If account doesn't exist, user isn't subscribed
-      if (!accountInfo) {
-        return false;
-      }
-      
-      // Deserialize the account data
-      const subscriptionData = deserialize(
-        SubscriptionAccount.schema,
-        SubscriptionAccount,
-        accountInfo.data
-      );
-      
-      return subscriptionData.is_subscribed;
-    } catch (err) {
-      // Account doesn't exist or other error
-      return false;
-    }
+    const balance = await connection.getBalance(userPubkey);
+    return balance >= SUBSCRIPTION_FEE;
   } catch (error) {
     console.error('Error checking subscription:', error);
     return false;
   }
+  
+  // When the program is deployed, use this code instead:
+  /*
+  try {
+    // Find the subscription account PDA
+    const [subscriptionAccount, _] = await findSubscriptionAccount(userPubkey);
+    
+    // Serialize the instruction
+    const buffer = Buffer.alloc(1);
+    buffer.writeUInt8(SubscriptionInstruction.CheckSubscription, 0);
+    
+    // Create the transaction instruction
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: userPubkey, isSigner: false, isWritable: false },
+        { pubkey: subscriptionAccount, isSigner: false, isWritable: false },
+      ],
+      programId: new PublicKey(PROGRAM_ID),
+      data: buffer,
+    });
+    
+    // Simulate the transaction to get the logs
+    const result = await connection.simulateTransaction(
+      new Transaction().add(instruction)
+    );
+    
+    // Check the logs to see if the user is subscribed
+    const logs = result.value.logs || [];
+    return logs.some(log => log.includes('User is subscribed'));
+  } catch (error) {
+    console.error('Error checking subscription:', error);
+    return false;
+  }
+  */
 }
 
 /**
@@ -176,45 +219,51 @@ export async function withdrawFees(
   adminKeypair: Keypair,
   amount: number
 ): Promise<string> {
-  try {
-    const adminPubkey = adminKeypair.publicKey;
-    
-    // Find the admin's subscription account
-    const [subscriptionAccount, _] = await findSubscriptionAccount(adminPubkey);
-    
-    // Create instruction data
-    const data = new WithdrawFeesData({
-      instruction: SubscriptionInstruction.WithdrawFees,
-      amount: amount * LAMPORTS_PER_SOL,
-    });
-    
-    const instructionData = Buffer.from(serialize(WithdrawFeesData.schema, data));
-    
-    // Create the instruction
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: adminPubkey, isSigner: true, isWritable: true },
-        { pubkey: subscriptionAccount, isSigner: false, isWritable: true },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      programId: new PublicKey(PROGRAM_ID),
-      data: instructionData,
-    });
-    
-    // Create and sign the transaction
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = adminPubkey;
-    
-    // Get recent blockhash
-    const { blockhash } = await connection.getLatestBlockhash();
-    transaction.recentBlockhash = blockhash;
-    
-    // Sign and send the transaction
-    const signature = await sendAndConfirmTransaction(connection, transaction, [adminKeypair]);
-    
-    return signature;
-  } catch (error) {
-    console.error('Error withdrawing fees:', error);
-    throw error;
-  }
+  // This function would only be used by the admin
+  // For development purposes, this is a placeholder
+  
+  throw new Error('Not implemented in development mode');
+  
+  // When the program is deployed, use this code instead:
+  /*
+  // Find the subscription account PDA
+  const [subscriptionAccount, _] = await PublicKey.findProgramAddress(
+    [Buffer.from('subscription')],
+    new PublicKey(PROGRAM_ID)
+  );
+  
+  // Serialize the instruction data
+  const withdrawData = new WithdrawFeesData({
+    instruction: SubscriptionInstruction.WithdrawFees,
+    amount: amount,
+  });
+  
+  const serializedData = borsh.serialize(
+    WithdrawFeesData.schema,
+    withdrawData
+  );
+  
+  // Create the transaction instruction
+  const instruction = new TransactionInstruction({
+    keys: [
+      { pubkey: adminKeypair.publicKey, isSigner: true, isWritable: true },
+      { pubkey: subscriptionAccount, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    programId: new PublicKey(PROGRAM_ID),
+    data: Buffer.from(serializedData),
+  });
+  
+  // Create and send the transaction
+  const transaction = new Transaction().add(instruction);
+  
+  // Sign and send transaction
+  const txId = await sendAndConfirmTransaction(
+    connection,
+    transaction,
+    [adminKeypair]
+  );
+  
+  return txId;
+  */
 }

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { useWallet } from "@/hooks/use-wallet";
+import { useSolanaWallet } from "@/contexts/SolanaWalletContext";
 import { TelegramModal } from "@/components/modals/telegram-modal";
+import { SubscriptionModal } from "@/components/modals/subscription-modal";
 import { 
   BarChart3, 
   ArrowLeftRight, 
@@ -11,14 +12,24 @@ import {
   LogOut, 
   Scale, 
   X, 
-  Menu 
+  Menu,
+  Wallet
 } from "lucide-react";
 
 export const Sidebar = () => {
   const [location] = useLocation();
-  const { walletAddress, walletBalance, isConnected, disconnectWallet } = useWallet();
+  const { publicKey, balance, isConnected, isSubscribed, connectWallet, disconnectWallet } = useSolanaWallet();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isTelegramModalOpen, setIsTelegramModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+
+  // Check if user needs to subscribe
+  useEffect(() => {
+    // Show subscription modal after wallet is connected but user is not subscribed
+    if (isConnected && !isSubscribed) {
+      setIsSubscriptionModalOpen(true);
+    }
+  }, [isConnected, isSubscribed]);
 
   const navigationItems = [
     { path: "/", label: "Dashboard", icon: <BarChart3 className="h-5 w-5 mr-3" /> },
@@ -55,33 +66,63 @@ export const Sidebar = () => {
           </button>
         </div>
         
-        {isConnected && (
+        {/* Wallet Section */}
+        {isConnected ? (
           <div className="p-3 bg-background rounded-xl mb-6 border border-sidebar-border">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-medium text-muted-foreground">Wallet</span>
               <span className="h-2 w-2 rounded-full bg-primary"></span>
             </div>
-            <div className="truncate font-mono text-sm mb-2 text-sidebar-foreground">{formatWalletAddress(walletAddress)}</div>
+            <div className="truncate font-mono text-sm mb-2 text-sidebar-foreground">
+              {formatWalletAddress(publicKey?.toString() || null)}
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">Balance</span>
-              <span className="text-sm font-medium text-sidebar-foreground">{walletBalance?.toFixed(2)} SOL</span>
+              <span className="text-sm font-medium text-sidebar-foreground">{balance?.toFixed(2)} SOL</span>
             </div>
+            {isSubscribed && (
+              <div className="mt-2 flex items-center text-xs text-green-400">
+                <span className="mr-1">●</span>
+                <span>Subscription Active</span>
+              </div>
+            )}
+            {!isSubscribed && (
+              <Button
+                variant="outline"
+                size="xs"
+                className="w-full mt-2 border-amber-500 text-amber-500 hover:bg-amber-500/10"
+                onClick={() => setIsSubscriptionModalOpen(true)}
+              >
+                Subscribe Now
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="mb-6">
+            <Button
+              variant="default"
+              className="w-full"
+              onClick={connectWallet}
+            >
+              <Wallet className="h-4 w-4 mr-2" />
+              Connect Wallet
+            </Button>
           </div>
         )}
         
         <nav className="space-y-1">
           {navigationItems.map((item) => (
-            <Link key={item.path} href={item.path}>
-              <a
-                className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                  location === item.path
-                    ? "bg-gradient-to-r from-background to-sidebar-background text-sidebar-foreground"
-                    : "text-muted-foreground hover:bg-background hover:text-sidebar-foreground"
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </a>
+            <Link 
+              key={item.path} 
+              href={item.path}
+              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
+                location === item.path
+                  ? "bg-gradient-to-r from-background to-sidebar-background text-sidebar-foreground"
+                  : "text-muted-foreground hover:bg-background hover:text-sidebar-foreground"
+              }`}
+            >
+              {item.icon}
+              {item.label}
             </Link>
           ))}
         </nav>
@@ -135,9 +176,15 @@ export const Sidebar = () => {
         </Button>
       </div>
 
+      {/* Modals */}
       <TelegramModal 
         isOpen={isTelegramModalOpen} 
         onClose={() => setIsTelegramModalOpen(false)} 
+      />
+
+      <SubscriptionModal 
+        isOpen={isSubscriptionModalOpen} 
+        onClose={() => setIsSubscriptionModalOpen(false)} 
       />
     </>
   );
