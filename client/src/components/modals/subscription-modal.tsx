@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useSolanaWallet, ADMIN_PUBKEY } from "@/contexts/SolanaWalletContext";
-import { paySubscription } from "@/lib/subscription";
+import { paySubscription, SUBSCRIPTION_CURRENCY } from "@/lib/subscription";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -15,7 +15,7 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
   const { connectWallet, isConnected, publicKey, balance, isSubscribed, connection, connecting } = useSolanaWallet();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Subscription fee is 10 SOL
+  // Subscription fee is 10 USDC
   const SUBSCRIPTION_FEE = 10;
 
   // Check if the user has enough balance
@@ -45,7 +45,7 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
     if (!hasEnoughBalance) {
       toast({
         title: "Insufficient balance",
-        description: `You need at least ${SUBSCRIPTION_FEE} SOL to subscribe`,
+        description: `You need at least ${SUBSCRIPTION_FEE} ${SUBSCRIPTION_CURRENCY} to subscribe`,
         variant: "destructive",
       });
       return;

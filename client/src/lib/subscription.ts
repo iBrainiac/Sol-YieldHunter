@@ -3,9 +3,12 @@ import { Connection, PublicKey, Transaction, TransactionInstruction, SystemProgr
 // Define the program ID (this will be determined when you deploy the program)
 const PROGRAM_ID = 'PLACEHOLDER_PROGRAM_ID'; // Replace with your actual program ID after deployment
 
-// Subscription fee in SOL
+// Subscription fee in USDC (10 USDC)
+// Note: In a real implementation, we would use the USDC SPL token program
+// For now we're simulating with SOL but representing it as USDC to the user
 const SUBSCRIPTION_FEE = 10;
 const LAMPORTS_PER_SOL = 1_000_000_000;
+export const SUBSCRIPTION_CURRENCY = "USDC";
 
 // Instruction enum for the subscription program
 enum SubscriptionInstruction {
