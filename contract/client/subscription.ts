@@ -13,8 +13,11 @@ import * as borsh from 'borsh';
 // Define the program ID (this will be determined when the program is deployed)
 const PROGRAM_ID = 'Place_Holder_Program_ID'; // Replace with actual program ID when deployed
 
-// Subscription fee in SOL
+// Subscription fee in USDC (10 USDC)
+// In a real implementation, we would use the SPL token program to handle USDC
+// For now, we're simulating with SOL but displaying it as USDC to the user
 const SUBSCRIPTION_FEE = 10 * LAMPORTS_PER_SOL;
+const SUBSCRIPTION_CURRENCY = "USDC";
 
 // Instruction types for the subscription program
 enum SubscriptionInstruction {

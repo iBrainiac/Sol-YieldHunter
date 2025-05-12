@@ -78,7 +78,8 @@ export async function paySubscription(
  * Check if a user has an active subscription
  * 
  * This is a simplified version for development that assumes all users
- * with a balance of over 10 SOL are subscribed
+ * with a balance of over 10 USDC are subscribed.
+ * For now, we're still using SOL for development but presenting it as USDC to the user.
  */
 export async function checkSubscription(
   connection: Connection,
@@ -87,9 +88,11 @@ export async function checkSubscription(
   try {
     // For development, we'll simulate subscription check
     // by checking if the user has enough SOL for a subscription
+    // In production, we would check the USDC token account balance
     const balance = await connection.getBalance(userPubkey);
     
     // In a real implementation, we would check the user's subscription account
+    // and the proper SPL token account for USDC
     return balance > SUBSCRIPTION_FEE * LAMPORTS_PER_SOL;
   } catch (error) {
     console.error('Error checking subscription:', error);

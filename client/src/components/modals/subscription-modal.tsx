@@ -104,7 +104,7 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
         <DialogHeader>
           <DialogTitle>Subscribe to YieldAggr</DialogTitle>
           <DialogDescription>
-            A one-time payment of 10 SOL is required to use the yield aggregator platform.
+            A one-time payment of 10 {SUBSCRIPTION_CURRENCY} is required to use the yield aggregator platform.
           </DialogDescription>
         </DialogHeader>
 
@@ -122,7 +122,7 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Subscription Fee</span>
-              <span className="text-sm font-semibold text-primary">10 SOL</span>
+              <span className="text-sm font-semibold text-primary">10 {SUBSCRIPTION_CURRENCY}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Payment</span>
@@ -153,7 +153,7 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Balance</span>
                 <span className={`text-sm ${hasEnoughBalance ? 'text-green-400' : 'text-red-400'}`}>
-                  {balance?.toFixed(2) || '0'} SOL
+                  {balance?.toFixed(2) || '0'} {SUBSCRIPTION_CURRENCY}
                 </span>
               </div>
             </>
@@ -178,7 +178,7 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
               onClick={handleSubscribe}
               disabled={isProcessing || !hasEnoughBalance}
             >
-              {isProcessing ? "Processing..." : hasEnoughBalance ? "Pay 10 SOL" : "Insufficient Balance"}
+              {isProcessing ? "Processing..." : hasEnoughBalance ? `Pay 10 ${SUBSCRIPTION_CURRENCY}` : "Insufficient Balance"}
             </Button>
           )}
         </DialogFooter>
