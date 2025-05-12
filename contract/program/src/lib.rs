@@ -10,6 +10,7 @@ use solana_program::{
     sysvar::{rent::Rent, Sysvar},
     borsh::try_from_slice_unchecked,
 };
+use spl_token::instruction as token_instruction;
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// Define the subscription account data structure
@@ -23,11 +24,13 @@ pub struct SubscriptionAccount {
 /// Instruction enum for the subscription program
 #[derive(BorshSerialize, BorshDeserialize, Debug)]
 pub enum SubscriptionInstruction {
-    /// Pay the subscription fee (10 SOL)
+    /// Pay the subscription fee (10 USDC)
     /// 0. `[signer]` The user paying for the subscription
     /// 1. `[writable]` The subscription PDA account owned by this program
     /// 2. `[writable]` The admin account that receives the fees
-    /// 3. `[]` System program
+    /// 3. `[]` SPL Token program
+    /// 4. `[writable]` User's USDC token account
+    /// 5. `[writable]` Admin's USDC token account
     PaySubscription,
     
     /// Withdraw fees (admin only)
@@ -121,20 +124,30 @@ pub fn process_pay_subscription(
         )?;
     }
     
-    // Subscription fee in SOL
-    let subscription_fee: u64 = 10_000_000_000; // 10 SOL
+    // Subscription fee in USDC
+    // Note: USDC has 6 decimal places, so 10 USDC = 10_000_000 
+    let subscription_fee: u64 = 10_000_000; // 10 USDC
     
-    // Transfer the subscription fee from user to admin
+    // Get the SPL token program and token accounts
+    let token_program = next_account_info(account_info_iter)?;
+    let user_token_account = next_account_info(account_info_iter)?;
+    let admin_token_account = next_account_info(account_info_iter)?;
+    
+    // Transfer USDC tokens from user's token account to admin's token account
     invoke(
-        &system_instruction::transfer(
+        &token_instruction::transfer(
+            token_program.key,
+            user_token_account.key,
+            admin_token_account.key,
             user_account.key,
-            admin_account.key,
+            &[],
             subscription_fee
-        ),
+        )?,
         &[
+            token_program.clone(),
+            user_token_account.clone(),
+            admin_token_account.clone(),
             user_account.clone(),
-            admin_account.clone(),
-            system_program.clone(),
         ],
     )?;
     

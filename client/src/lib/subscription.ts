@@ -1,4 +1,5 @@
 import { Connection, PublicKey, Transaction, TransactionInstruction, SystemProgram } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 // Define the program ID (this will be determined when you deploy the program)
 const PROGRAM_ID = 'PLACEHOLDER_PROGRAM_ID'; // Replace with your actual program ID after deployment
@@ -45,8 +46,37 @@ export async function paySubscription(
     // Find the user's subscription account PDA
     const [subscriptionAccount, _] = await findSubscriptionAccount(userPubkey);
     
-    // In development mode, we'll create a simple transfer transaction
-    // instead of invoking our program (which isn't deployed yet)
+    // In development mode, we're still using SOL transfers to simulate USDC payments
+    // In production, we would use the SPL token program to transfer USDC tokens
+    
+    // Normally we'd use code like this to transfer USDC tokens:
+    /* 
+    // Get the USDC token mint address (different for each network)
+    const usdcMintAddress = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"); // Mainnet USDC
+    
+    // Find the user's and admin's USDC token accounts
+    const userTokenAccount = await getAssociatedTokenAddress(
+      usdcMintAddress,
+      userPubkey
+    );
+    
+    const adminTokenAccount = await getAssociatedTokenAddress(
+      usdcMintAddress,
+      adminPubkey
+    );
+    
+    // Create a transaction to transfer USDC tokens
+    const transaction = new Transaction().add(
+      createTransferInstruction(
+        userTokenAccount,
+        adminTokenAccount,
+        userPubkey,
+        SUBSCRIPTION_FEE * 1000000  // USDC has 6 decimal places
+      )
+    );
+    */
+    
+    // For development, we'll still use SOL transfers to simulate USDC
     const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: userPubkey,
