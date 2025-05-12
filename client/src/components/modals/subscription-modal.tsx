@@ -71,7 +71,8 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
         body: JSON.stringify({
           walletAddress: publicKey.toString(),
           transactionHash: txSignature,
-          amount: SUBSCRIPTION_FEE
+          amount: SUBSCRIPTION_FEE,
+          currency: SUBSCRIPTION_CURRENCY
         }),
       });
 

@@ -96,6 +96,7 @@ export const solanaSubscriptions = pgTable("solana_subscriptions", {
   subscriptionDate: timestamp("subscription_date").defaultNow().notNull(),
   transactionHash: text("transaction_hash"),
   amount: numeric("amount", { precision: 20, scale: 9 }).notNull(),
+  currency: text("currency").default("USDC").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
 });
 

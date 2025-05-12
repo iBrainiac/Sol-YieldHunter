@@ -107,10 +107,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subscriptionSchema = z.object({
         walletAddress: z.string(),
         transactionHash: z.string(),
-        amount: z.number()
+        amount: z.number(),
+        currency: z.string().default("USDC")
       });
       
-      const { walletAddress, transactionHash, amount } = subscriptionSchema.parse(req.body);
+      const { walletAddress, transactionHash, amount, currency } = subscriptionSchema.parse(req.body);
       
       // Find or create user
       let user = await storage.getUserByWalletAddress(walletAddress);
@@ -129,6 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: user.id,
         transactionHash,
         amount,
+        currency,
         isActive: true
       });
       
