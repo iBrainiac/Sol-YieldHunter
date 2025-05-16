@@ -63,8 +63,8 @@ export const TelegramModal = ({ isOpen, onClose }: TelegramModalProps) => {
               </svg>
             </div>
             <div className="ml-4">
-              <h4 className="text-md font-semibold text-card-foreground">YieldAggrBot</h4>
-              <p className="text-sm text-muted-foreground">Official Yield Aggregator Bot</p>
+              <h4 className="text-md font-semibold text-card-foreground">SolYieldHunterBot</h4>
+              <p className="text-sm text-muted-foreground">Official Sol YieldHunter Bot</p>
             </div>
           </div>
           

@@ -6,7 +6,7 @@ export class TelegramService {
   private bot: TelegramBot | null = null;
   private userConnections: Map<string, { chatId: string; username: string }>;
   private pendingConnections: Map<string, string>; // Maps tokens to sessionIds
-  private botUsername: string = 'YieldAggrBot';
+  private botUsername: string = 'SolYieldHunterBot';
 
   constructor() {
     this.userConnections = new Map();
@@ -50,7 +50,7 @@ export class TelegramService {
       const token = match?.[1];
       
       if (!token) {
-        this.bot!.sendMessage(chatId, 'Welcome to YieldAggr Bot! To connect your account, please use the link from the app.');
+        this.bot!.sendMessage(chatId, 'Welcome to Sol YieldHunter Bot! To connect your account, please use the link from the app.');
         return;
       }
       
@@ -73,7 +73,7 @@ export class TelegramService {
         
         this.bot!.sendMessage(
           chatId,
-          '✅ Your account has been successfully connected to YieldAggr!\n\n' +
+          '✅ Your account has been successfully connected to Sol YieldHunter!\n\n' +
           'You can now use the following commands:\n' +
           '/yields - Show best yield opportunities\n' +
           '/portfolio - View your portfolio\n' +
@@ -159,7 +159,7 @@ export class TelegramService {
       
       this.bot!.sendMessage(
         chatId,
-        '*YieldAggr Bot Commands*\n\n' +
+        '*Sol YieldHunter Bot Commands*\n\n' +
         '/yields - Show best yield opportunities\n' +
         '/portfolio - View your portfolio\n' +
         '/invest - Create new investment\n' +
