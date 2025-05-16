@@ -20,6 +20,7 @@ import { storage } from "./storage";
 import { SolanaService } from "./services/solana";
 import { TelegramService } from "./services/telegram";
 import { YieldAnalyzer } from "./services/yield-analyzer";
+import { OpenAIService } from "./services/openai";
 import { z } from "zod";
 import {
   insertUserPreferencesSchema,
@@ -34,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const solanaService = new SolanaService();
   const telegramService = new TelegramService();
   const yieldAnalyzer = new YieldAnalyzer();
+  const openAIService = new OpenAIService();
 
   // API routes
   // ===========================================================
@@ -266,6 +268,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(telegramStatus);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // SolSeeker AI Chat Routes
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: "Message is required" });
+      }
+      
+      // Check if wallet is connected
+      const walletStatus = await solanaService.getWalletStatus(req.sessionID);
+      
+      if (!walletStatus.connected) {
+        return res.status(401).json({ error: "Wallet not connected" });
+      }
+      
+      // Process message with OpenAI
+      const result = await openAIService.processMessage(req.sessionID, message);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error('Error processing chat message:', error);
+      res.status(500).json({ error: error.message || 'Failed to process message' });
     }
   });
 

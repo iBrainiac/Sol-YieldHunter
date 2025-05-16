@@ -26,7 +26,7 @@ export default function SolSeeker() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
-                <InfoCircledIcon className="mr-2 h-5 w-5" />
+                <InfoIcon className="mr-2 h-5 w-5" />
                 About SolSeeker
               </CardTitle>
             </CardHeader>

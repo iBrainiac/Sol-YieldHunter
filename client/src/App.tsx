@@ -6,6 +6,7 @@ import Opportunities from "@/pages/opportunities";
 import Transactions from "@/pages/transactions";
 import FAQ from "@/pages/faq";
 import Settings from "@/pages/settings";
+import SolSeeker from "@/pages/solseeker";
 import { Sidebar } from "@/components/layout/sidebar";
 import { SolanaWalletProvider } from "@/contexts/SolanaWalletContext";
 
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/transactions" component={Transactions} />
       <Route path="/faq" component={FAQ} />
       <Route path="/settings" component={Settings} />
+      <Route path="/solseeker" component={SolSeeker} />
       <Route component={NotFound} />
     </Switch>
   );

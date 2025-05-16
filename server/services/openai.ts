@@ -112,7 +112,7 @@ export class OpenAIService {
    */
   private formatYieldOpportunities(opportunities: YieldOpportunity[]): string {
     return opportunities.map((opp, index) => {
-      return `${index + 1}. ${opp.name} (ID: ${opp.id}) on ${opp.protocol}: APY ${opp.apy}%, Risk: ${opp.risk}/10, Min Investment: ${opp.minInvestment} ${opp.asset}`;
+      return `${index + 1}. ${opp.name} (ID: ${opp.id}) on ${opp.protocol}: APY ${opp.apy}%, Risk Level: ${opp.riskLevel}, TVL: ${opp.tvl}`;
     }).join('\n');
   }
   
