@@ -103,7 +103,7 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Subscribe to YieldAggr</DialogTitle>
+          <DialogTitle>Subscribe to Sol YieldHunter</DialogTitle>
           <DialogDescription>
             A one-time payment of 10 {SUBSCRIPTION_CURRENCY} is required to use the yield aggregator platform.
           </DialogDescription>
@@ -112,11 +112,11 @@ export const SubscriptionModal = ({ isOpen, onClose }: SubscriptionModalProps) =
         <div className="p-4 bg-background rounded-lg mb-4 border border-border">
           <div className="flex items-center mb-4">
             <div className="w-12 h-12 rounded-full bg-gradient-to-r from-sidebar-accent to-sidebar-primary flex items-center justify-center text-white font-bold text-xl mr-4">
-              YA
+              SY
             </div>
             <div>
-              <h3 className="text-md font-semibold text-card-foreground">YieldAggr Platform</h3>
-              <p className="text-sm text-muted-foreground">Premium Yield Aggregation Service</p>
+              <h3 className="text-md font-semibold text-card-foreground">Sol YieldHunter Platform</h3>
+              <p className="text-sm text-muted-foreground">Premium Solana Yield Aggregation Service</p>
             </div>
           </div>
           

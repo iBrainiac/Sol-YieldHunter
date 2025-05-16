@@ -54,9 +54,9 @@ export const Sidebar = () => {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-sidebar-accent to-sidebar-primary flex items-center justify-center text-white font-bold text-xl">
-              YA
+              SY
             </div>
-            <span className="ml-3 text-xl font-semibold text-sidebar-foreground">YieldAggr</span>
+            <span className="ml-3 text-xl font-semibold text-sidebar-foreground">Sol YieldHunter</span>
           </div>
           <button 
             className="md:hidden text-sidebar-foreground"
@@ -162,9 +162,9 @@ export const Sidebar = () => {
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center justify-between p-4 bg-sidebar-background">
         <div className="flex items-center">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-sidebar-accent to-sidebar-primary flex items-center justify-center text-white font-bold text-xl">
-            YA
+            SY
           </div>
-          <span className="ml-3 text-xl font-semibold text-sidebar-foreground">YieldAggr</span>
+          <span className="ml-3 text-xl font-semibold text-sidebar-foreground">Sol YieldHunter</span>
         </div>
         <Button
           variant="ghost"
