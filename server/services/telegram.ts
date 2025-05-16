@@ -6,7 +6,7 @@ export class TelegramService {
   private bot: TelegramBot | null = null;
   private userConnections: Map<string, { chatId: string; username: string }>;
   private pendingConnections: Map<string, string>; // Maps tokens to sessionIds
-  private botUsername: string = 'SolYieldHunterBot';
+  private botUsername: string = 'SolYieldHunter2Bot';
 
   constructor() {
     this.userConnections = new Map();
