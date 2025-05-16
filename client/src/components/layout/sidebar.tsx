@@ -13,7 +13,8 @@ import {
   Scale, 
   X, 
   Menu,
-  Wallet
+  Wallet,
+  Bot
 } from "lucide-react";
 
 export const Sidebar = () => {
@@ -35,6 +36,7 @@ export const Sidebar = () => {
     { path: "/", label: "Dashboard", icon: <BarChart3 className="h-5 w-5 mr-3" /> },
     { path: "/opportunities", label: "Opportunities", icon: <Scale className="h-5 w-5 mr-3" /> },
     { path: "/transactions", label: "Transactions", icon: <ArrowLeftRight className="h-5 w-5 mr-3" /> },
+    { path: "/solseeker", label: "SolSeeker AI", icon: <Bot className="h-5 w-5 mr-3" /> },
     { path: "/faq", label: "FAQ & Help", icon: <HelpCircle className="h-5 w-5 mr-3" /> },
     { path: "/settings", label: "Settings", icon: <Settings className="h-5 w-5 mr-3" /> }
   ];
