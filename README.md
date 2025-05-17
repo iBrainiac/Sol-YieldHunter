@@ -146,6 +146,13 @@ Sol-YieldHunter employs a modular architecture consisting of:
                        └─────────────────┘
 ```
 
+
+
+
+
+
+
+
 ## Smart Contracts
 
 Sol-YieldHunter utilizes several custom Solana programs:
